@@ -1,0 +1,30 @@
+{
+  "name": "avalon-frontend",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "cross-env NODE_OPTIONS='--no-deprecation' nuxt build",
+    "dev": "cross-env NODE_OPTIONS='--no-deprecation' nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.1.0",
+    "@tailwindcss/vite": "^4.1.16",
+    "axios": "^1.13.1",
+    "chart.js": "^4.5.1",
+    "date-fns": "^4.1.0",
+    "nuxt": "^4.2.0",
+    "socket.io-client": "^4.8.1",
+    "tailwindcss": "^4.1.16",
+    "vue": "^3.5.22",
+    "vue-chartjs": "^5.3.2",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@nuxt/icon": "^2.1.0",
+    "cross-env": "^10.1.0"
+  }
+}

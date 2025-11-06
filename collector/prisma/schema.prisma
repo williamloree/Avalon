@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ErrorEvent {
+  id        String   @id @default(cuid())
+  service   String
+  message   String?
+  stack     String?
+  path      String?
+  method    String?
+  level     String   @default("error")
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([service])
+  @@index([createdAt])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  apiKeys   ApiKey[]
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique
+  service     String
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+  @@index([service])
+  @@index([isActive])
+}

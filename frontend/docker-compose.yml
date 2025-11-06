@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NUXT_PUBLIC_API_BASE=http://localhost:4000
+    depends_on:
+      - collector
+    networks:
+      - avalon-network
+
+  collector:
+    build:
+      context: ../collector
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=postgresql://avalon:avalon_password@postgres:5432/avalon
+      - DISCORD_ENABLED=false
+    depends_on:
+      - postgres
+    networks:
+      - avalon-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=avalon
+      - POSTGRES_PASSWORD=avalon_password
+      - POSTGRES_DB=avalon
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - avalon-network
+
+networks:
+  avalon-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

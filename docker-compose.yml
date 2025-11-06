@@ -1,0 +1,87 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: avalon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: avalon
+      POSTGRES_PASSWORD: avalon_password
+      POSTGRES_DB: avalon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avalon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - avalon-network
+
+  # Collector Backend
+  collector:
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+    container_name: avalon-collector
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://avalon:avalon_password@postgres:5432/avalon
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - collector_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - avalon-network
+
+  # Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NUXT_PUBLIC_API_BASE: http://localhost:4000
+    container_name: avalon-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      collector:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - avalon-network
+
+networks:
+  avalon-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  collector_logs:
+    driver: local

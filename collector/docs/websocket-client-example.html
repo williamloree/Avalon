@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avalon - WebSocket Client Example</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .status.disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+        .controls {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .controls button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            background-color: #4CAF50;
+            color: white;
+        }
+        .controls button:hover {
+            background-color: #45a049;
+        }
+        .controls input {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #333;
+            color: #e0e0e0;
+        }
+        .notification {
+            background: #2a2a2a;
+            border-left: 4px solid;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .notification.error {
+            border-color: #FF0000;
+        }
+        .notification.warning, .notification.warn {
+            border-color: #FFA500;
+        }
+        .notification.info {
+            border-color: #00BFFF;
+        }
+        .notification.debug {
+            border-color: #808080;
+        }
+        .notification.fatal, .notification.critical {
+            border-color: #DC143C;
+        }
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .notification-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .notification-time {
+            color: #888;
+            font-size: 12px;
+        }
+        .notification-body {
+            margin-bottom: 10px;
+        }
+        .notification-stack {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .stats {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #333;
+            border-radius: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Avalon - WebSocket Client Example</h1>
+
+    <div id="status" class="status disconnected">Déconnecté</div>
+
+    <div class="stats">
+        <h2>Statistiques</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value" id="total-errors">0</div>
+                <div class="stat-label">Total d'erreurs</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="error-count">0</div>
+                <div class="stat-label">Erreurs</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="warning-count">0</div>
+                <div class="stat-label">Avertissements</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="info-count">0</div>
+                <div class="stat-label">Infos</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <h2>Contrôles</h2>
+        <div>
+            <input type="text" id="service-name" placeholder="Nom du service" value="my-app">
+            <button onclick="subscribeToService()">S'abonner au service</button>
+            <button onclick="unsubscribeFromService()">Se désabonner du service</button>
+        </div>
+        <div>
+            <select id="level-select">
+                <option value="error">Error</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+            </select>
+            <button onclick="subscribeToLevel()">S'abonner au niveau</button>
+            <button onclick="unsubscribeFromLevel()">Se désabonner du niveau</button>
+        </div>
+        <div>
+            <button onclick="clearNotifications()">Effacer les notifications</button>
+        </div>
+    </div>
+
+    <h2>Notifications en temps réel</h2>
+    <div id="notifications"></div>
+
+    <script>
+        // Configuration
+        const WEBSOCKET_URL = 'http://localhost:3000'; // Modifiez selon votre configuration
+
+        // Stats
+        let stats = {
+            total: 0,
+            error: 0,
+            warning: 0,
+            info: 0
+        };
+
+        // Connexion au WebSocket
+        const socket = io(WEBSOCKET_URL);
+
+        // Événements de connexion
+        socket.on('connect', () => {
+            console.log('Connected to Avalon WebSocket');
+            document.getElementById('status').className = 'status connected';
+            document.getElementById('status').textContent = 'Connecté';
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from Avalon WebSocket');
+            document.getElementById('status').className = 'status disconnected';
+            document.getElementById('status').textContent = 'Déconnecté';
+        });
+
+        // Écouter toutes les nouvelles erreurs
+        socket.on('error:new', (error) => {
+            console.log('New error received:', error);
+            displayNotification(error);
+            updateStats(error);
+        });
+
+        // Écouter les erreurs d'un service spécifique
+        socket.on('error:service', (error) => {
+            console.log('Service error received:', error);
+            // Vous pouvez traiter différemment les erreurs de service
+        });
+
+        // Écouter les erreurs d'un niveau spécifique
+        socket.on('error:level', (error) => {
+            console.log('Level error received:', error);
+            // Vous pouvez traiter différemment les erreurs de niveau
+        });
+
+        // Fonctions de contrôle
+        function subscribeToService() {
+            const serviceName = document.getElementById('service-name').value;
+            if (serviceName) {
+                socket.emit('subscribe:service', serviceName);
+                alert(`Abonné au service: ${serviceName}`);
+            }
+        }
+
+        function unsubscribeFromService() {
+            const serviceName = document.getElementById('service-name').value;
+            if (serviceName) {
+                socket.emit('unsubscribe:service', serviceName);
+                alert(`Désabonné du service: ${serviceName}`);
+            }
+        }
+
+        function subscribeToLevel() {
+            const level = document.getElementById('level-select').value;
+            socket.emit('subscribe:level', level);
+            alert(`Abonné au niveau: ${level}`);
+        }
+
+        function unsubscribeFromLevel() {
+            const level = document.getElementById('level-select').value;
+            socket.emit('unsubscribe:level', level);
+            alert(`Désabonné du niveau: ${level}`);
+        }
+
+        function clearNotifications() {
+            document.getElementById('notifications').innerHTML = '';
+            stats = { total: 0, error: 0, warning: 0, info: 0 };
+            updateStatsDisplay();
+        }
+
+        // Fonction pour afficher une notification
+        function displayNotification(error) {
+            const notificationsDiv = document.getElementById('notifications');
+            const notification = document.createElement('div');
+            notification.className = `notification ${error.level.toLowerCase()}`;
+
+            const emoji = {
+                error: '🔴',
+                warning: '🟠',
+                warn: '🟠',
+                info: '🔵',
+                debug: '⚪',
+                fatal: '💀',
+                critical: '🚨'
+            }[error.level.toLowerCase()] || '⚠️';
+
+            const time = new Date(error.createdAt).toLocaleString('fr-FR');
+
+            notification.innerHTML = `
+                <div class="notification-header">
+                    <div class="notification-title">
+                        ${emoji} ${error.level.toUpperCase()} - ${error.service}
+                    </div>
+                    <div class="notification-time">${time}</div>
+                </div>
+                <div class="notification-body">
+                    <strong>Message:</strong> ${error.message || 'No message'}
+                    ${error.path ? `<br><strong>Path:</strong> ${error.method || 'GET'} ${error.path}` : ''}
+                    <br><strong>ID:</strong> ${error.id}
+                </div>
+                ${error.stack ? `<div class="notification-stack">${escapeHtml(error.stack)}</div>` : ''}
+            `;
+
+            // Insérer au début pour voir les plus récentes en premier
+            notificationsDiv.insertBefore(notification, notificationsDiv.firstChild);
+
+            // Limiter le nombre de notifications affichées
+            while (notificationsDiv.children.length > 50) {
+                notificationsDiv.removeChild(notificationsDiv.lastChild);
+            }
+        }
+
+        // Fonction pour mettre à jour les statistiques
+        function updateStats(error) {
+            stats.total++;
+            const level = error.level.toLowerCase();
+            if (level === 'error' || level === 'fatal' || level === 'critical') {
+                stats.error++;
+            } else if (level === 'warning' || level === 'warn') {
+                stats.warning++;
+            } else if (level === 'info') {
+                stats.info++;
+            }
+            updateStatsDisplay();
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('total-errors').textContent = stats.total;
+            document.getElementById('error-count').textContent = stats.error;
+            document.getElementById('warning-count').textContent = stats.warning;
+            document.getElementById('info-count').textContent = stats.info;
+        }
+
+        // Fonction utilitaire pour échapper le HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
