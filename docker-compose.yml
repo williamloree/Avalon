@@ -25,7 +25,6 @@ services:
     build:
       context: ./collector
       dockerfile: Dockerfile
-    image: registry.williamloree.fr/collector
     container_name: avalon-collector
     restart: unless-stopped
     environment:
@@ -52,7 +51,9 @@ services:
 
   # Frontend Dashboard
   frontend:
-    image: registry.williamloree.fr/avalon-app
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: avalon-frontend
     restart: unless-stopped
     environment:
