@@ -67,6 +67,24 @@ async function main() {
     console.log('   Name:', testApiKey.name);
   }
 
+  // Créer les settings par défaut
+  const existingSettings = await prisma.settings.findFirst();
+
+  if (existingSettings) {
+    console.log('✅ Settings already exist');
+  } else {
+    const settings = await prisma.settings.create({
+      data: {
+        discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || null,
+        discordEnabled: process.env.DISCORD_ENABLED === 'true',
+      },
+    });
+
+    console.log('✅ Default settings created:');
+    console.log('   Discord Enabled:', settings.discordEnabled);
+    console.log('   Discord Webhook URL:', settings.discordWebhookUrl ? '***configured***' : 'not set');
+  }
+
   // Créer des erreurs de démo
   const existingDemoErrors = await prisma.errorEvent.count({
     where: { service: testServiceName },

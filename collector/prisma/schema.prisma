@@ -47,3 +47,11 @@ model ApiKey {
   @@index([service])
   @@index([isActive])
 }
+
+model Settings {
+  id                 String   @id @default(cuid())
+  discordWebhookUrl  String?
+  discordEnabled     Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

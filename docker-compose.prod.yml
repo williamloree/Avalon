@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database
   postgres:
@@ -5,15 +7,15 @@ services:
     container_name: avalon-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: avalon
-      POSTGRES_PASSWORD: avalon_password
-      POSTGRES_DB: avalon
+      POSTGRES_USER: ${POSTGRES_USER:-avalon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avalon_password}
+      POSTGRES_DB: ${POSTGRES_DB:-avalon}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5454}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U avalon"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-avalon}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,20 +24,18 @@ services:
 
   # Collector Backend
   collector:
-    build:
-      context: ./collector
-      dockerfile: Dockerfile
-    image: registry.williamloree.fr/collector
+    image: registry.williamloree.fr/collector:latest
     container_name: avalon-collector
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://avalon:avalon_password@postgres:5432/avalon
+      DATABASE_URL: postgresql://${POSTGRES_USER:-avalon}:${POSTGRES_PASSWORD:-avalon_password}@postgres:5432/${POSTGRES_DB:-avalon}
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      DISCORD_ENABLED: ${DISCORD_ENABLED:-false}
     ports:
-      - "4000:4000"
+      - "${COLLECTOR_PORT:-4400}:4000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,18 +49,22 @@ services:
       start_period: 40s
     networks:
       - avalon-network
+    labels:
+      - "com.avalon.description=Avalon Error Collector Backend"
+      - "com.avalon.version=1.0.0"
 
   # Frontend Dashboard
   frontend:
-    image: registry.williamloree.fr/avalon-app
+    image: registry.williamloree.fr/avalon-app:latest
     container_name: avalon-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-http://localhost:4400}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3300}:3000"
     depends_on:
       collector:
         condition: service_healthy
@@ -72,13 +76,19 @@ services:
       start_period: 60s
     networks:
       - avalon-network
+    labels:
+      - "com.avalon.description=Avalon Frontend Dashboard"
+      - "com.avalon.version=1.0.0"
 
 networks:
   avalon-network:
     driver: bridge
+    name: avalon-network
 
 volumes:
   postgres_data:
     driver: local
+    name: avalon-postgres-data
   collector_logs:
     driver: local
+    name: avalon-collector-logs

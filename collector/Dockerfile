@@ -17,11 +17,18 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
 
+# Définir une DATABASE_URL factice pour le build
+# Elle sera remplacée par la vraie au runtime via docker-compose
+ENV DATABASE_URL="postgresql://user:password@localhost:5432/db"
+
 # Générer le client Prisma
 RUN npx prisma generate
 
-# Compiler TypeScript
+# Compiler TypeScript (app)
 RUN npm run build
+
+# Compiler le seed séparément
+RUN npx tsc prisma/seed.ts --outDir dist/prisma --module commonjs --esModuleInterop --resolveJsonModule --skipLibCheck
 
 # Stage 2: Production - Image légère finale
 FROM node:18-alpine
@@ -55,5 +62,6 @@ ENV PORT=4000
 
 # Commande de démarrage
 # 1. Appliquer les migrations Prisma
-# 2. Lancer l'application
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/index.js"]
+# 2. Exécuter le seed (compilé en JS)
+# 3. Lancer l'application
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && (node dist/prisma/seed.js || true) && node dist/index.js"]

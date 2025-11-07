@@ -1,7 +1,12 @@
-# Environment variables
+# Environment variables (contiennent des secrets)
 .env
+.env.production
 .env.local
 .env.*.local
+
+# Backup SQL files
+*.sql
+backup_*.sql
 
 # Dependencies
 node_modules/

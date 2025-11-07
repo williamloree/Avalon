@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { config } from '../config/env';
 import type { ErrorEventRecord } from '../types';
+import { settingsService } from './settings.service';
 
 interface DiscordEmbed {
   title: string;
@@ -18,8 +18,6 @@ interface DiscordEmbed {
 }
 
 class DiscordService {
-  private webhookUrl: string | undefined;
-
   private readonly levelColors: Record<string, number> = {
     error: 0xFF0000,    // Rouge
     warning: 0xFFA500,  // Orange
@@ -40,10 +38,6 @@ class DiscordService {
     critical: '🚨',
   };
 
-  constructor() {
-    this.webhookUrl = config.discordWebhookUrl;
-  }
-
   private getColorForLevel(level: string): number {
     return this.levelColors[level.toLowerCase()] || 0x808080;
   }
@@ -53,11 +47,14 @@ class DiscordService {
   }
 
   async sendErrorNotification(record: ErrorEventRecord): Promise<void> {
-    if (!config.discordEnabled || !this.webhookUrl) {
-      return;
-    }
-
     try {
+      // Récupérer les settings depuis la BDD
+      const settings = await settingsService.getSettings();
+
+      if (!settings.discordEnabled || !settings.discordWebhookUrl) {
+        return;
+      }
+
       const emoji = this.getEmojiForLevel(record.level);
       const color = this.getColorForLevel(record.level);
 
@@ -110,7 +107,7 @@ class DiscordService {
         },
       };
 
-      await axios.post(this.webhookUrl, {
+      await axios.post(settings.discordWebhookUrl, {
         embeds: [embed],
       });
     } catch (error: any) {

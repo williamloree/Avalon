@@ -7,6 +7,7 @@ import errorRoutes from './routes/error.routes';
 import testRoutes from './routes/test.routes';
 import authRoutes from './routes/auth.routes';
 import apiKeyRoutes from './routes/apiKey.routes';
+import settingsRoutes from './routes/settings.routes';
 import cors from "cors"
 
 export function createApp(): Application {
@@ -19,6 +20,7 @@ export function createApp(): Application {
 
   app.use('/auth', authRoutes);
   app.use('/api-keys', apiKeyRoutes);
+  app.use('/settings', settingsRoutes);
   app.use('/', errorRoutes);
   app.use('/', testRoutes);
 

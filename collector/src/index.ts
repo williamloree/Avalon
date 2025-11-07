@@ -4,7 +4,6 @@ import { databaseService } from './services/database.service';
 import { websocketService } from './services/websocket.service';
 
 const app = createApp();
-
 const server = app.listen(config.port, () => {
   console.log(`Avalon listening on port ${config.port}`);
 

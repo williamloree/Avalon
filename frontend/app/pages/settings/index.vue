@@ -11,6 +11,7 @@ useHead({
 
 const colorMode = useColorMode();
 const { user } = useAuth();
+const { fetchSettings, updateSettings, settings: appSettings, loading: settingsLoading } = useSettings();
 
 // State
 const isSaving = ref(false);
@@ -24,6 +25,11 @@ const settings = ref({
   retentionDays: 30,
   autoDelete: false,
   theme: colorMode.preference,
+});
+
+const discordSettings = ref({
+  webhookUrl: "",
+  enabled: true,
 });
 
 // Theme options
@@ -42,11 +48,18 @@ watch(() => settings.value.theme, (newTheme) => {
 const saveSettings = async () => {
   isSaving.value = true;
   try {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    // Save to localStorage
+    // Save to localStorage (local settings)
     localStorage.setItem("avalon-settings", JSON.stringify(settings.value));
+
+    // Save Discord settings to API
+    const result = await updateSettings({
+      discordWebhookUrl: discordSettings.value.webhookUrl || null,
+      discordEnabled: discordSettings.value.enabled,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || "Failed to save settings");
+    }
 
     // Show success message
     const toast = useToast();
@@ -60,7 +73,7 @@ const saveSettings = async () => {
     const toast = useToast();
     toast.add({
       title: "Error",
-      description: "Failed to save settings",
+      description: e.message || "Failed to save settings",
       color: "red",
       icon: "i-heroicons-x-circle",
     });
@@ -93,7 +106,7 @@ const resetSettings = () => {
 };
 
 // Load settings on mount
-onMounted(() => {
+onMounted(async () => {
   const saved = localStorage.getItem("avalon-settings");
   if (saved) {
     try {
@@ -102,6 +115,15 @@ onMounted(() => {
     } catch (e) {
       console.error("Failed to load settings", e);
     }
+  }
+
+  // Load Discord settings from API
+  const result = await fetchSettings();
+  if (result.success && result.data) {
+    discordSettings.value = {
+      webhookUrl: result.data.discordWebhookUrl || "",
+      enabled: result.data.discordEnabled,
+    };
   }
 });
 </script>
@@ -263,6 +285,80 @@ onMounted(() => {
                 placeholder="admin@example.com"
               />
             </UFormField>
+          </div>
+        </UCard>
+
+        <!-- Discord Integration -->
+        <UCard class="group hover:shadow-xl transition-all duration-300 lg:col-span-2">
+          <template #header>
+            <div class="flex items-center gap-3">
+              <div
+                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300"
+              >
+                <Icon name="i-heroicons-chat-bubble-left-right" class="w-6 h-6" />
+              </div>
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  Discord Integration
+                </h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Configure Discord webhook for error notifications
+                </p>
+              </div>
+            </div>
+          </template>
+
+          <div class="space-y-4">
+            <div class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/20 flex items-center justify-center">
+                  <Icon name="i-heroicons-bell-alert" class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    Enable Discord Notifications
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Send error notifications to Discord channel
+                  </p>
+                </div>
+              </div>
+              <UToggle v-model="discordSettings.enabled" size="lg" />
+            </div>
+
+            <UFormField
+              label="Discord Webhook URL"
+              description="Enter your Discord webhook URL to receive error notifications"
+              :disabled="!discordSettings.enabled"
+            >
+              <UInput
+                v-model="discordSettings.webhookUrl"
+                type="text"
+                size="lg"
+                icon="i-heroicons-link"
+                placeholder="https://discord.com/api/webhooks/..."
+                :disabled="!discordSettings.enabled"
+                class="w-full"
+              />
+            </UFormField>
+
+            <UAlert
+              v-if="discordSettings.enabled && discordSettings.webhookUrl"
+              icon="i-heroicons-check-circle"
+              color="primary"
+              variant="soft"
+              title="Discord Integration Active"
+              description="Error notifications will be sent to your Discord channel"
+            />
+
+            <UAlert
+              v-else-if="discordSettings.enabled && !discordSettings.webhookUrl"
+              icon="i-heroicons-exclamation-triangle"
+              color="orange"
+              variant="soft"
+              title="Webhook URL Required"
+              description="Please enter a Discord webhook URL to enable notifications"
+            />
           </div>
         </UCard>
 
